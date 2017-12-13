@@ -1,0 +1,4 @@
+workdir/
+.config
+.idea/
+.DS_Store
