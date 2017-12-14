@@ -1,5 +1,6 @@
 #!/bin/bash
 #Reference: https://www.bjwf125.com/?p=9
+# https://www.zfl9.com/ss-redir.html
 
 export CHINA_IPS_FILE_1=/etc/shadowsocks/cn_ips_1
 export CHINA_IPS_FILE_2=/etc/shadowsocks/cn_ips_2
@@ -28,13 +29,28 @@ function fetch_china_ips(){
 
 function netfilter_clear_pre_setting(){
   echo "[NETFILTER] clear setting"
-  iptables -t nat -D POSTROUTING -s 192.168/16 -j MASQUERADE
+  # iptables -t nat -D POSTROUTING -s 192.168/16 -j MASQUERADE
 
-  iptables -t nat -D PREROUTING -s 192.168/16 -j SHADOWSOCKS
-  iptables -t nat -D OUTPUT  ! -p icmp -j SHADOWSOCKS
+  # iptables -t nat -D PREROUTING -s 192.168/16 -j SHADOWSOCKS
+  # iptables -t nat -D OUTPUT  ! -p icmp -j SHADOWSOCKS
+
+  # iptables -t nat -F SHADOWSOCKS
+  # iptables -t nat -X SHADOWSOCKS
+
+  iptables -t nat -F OUTPUT
+  iptables -t nat -F POSTROUTING
+  iptables -t nat -F PREROUTING
+  iptables -t mangle -F POSTROUTING
+  iptables -t mangle -F PREROUTING
 
   iptables -t nat -F SHADOWSOCKS
   iptables -t nat -X SHADOWSOCKS
+  iptables -t nat -Z SHADOWSOCKS
+
+  iptables -t mangle -F SHADOWSOCKS
+  iptables -t mangle -X SHADOWSOCKS
+  iptables -t mangle -Z SHADOWSOCKS
+
   ipset destroy ${IPS_CN}
 }
 
@@ -54,27 +70,67 @@ function netfilter_build_china_ipset(){
   rm ./${ipset_file}
 }
 
+function iptables_return(){
+  # Ignore LANs and any other addresses you'd like to bypass the proxy
+  # See Wikipedia and RFC5735 for full list of reserved networks.
+  # See ashi009/bestroutetb for a highly optimized CHN route list.
+  echo [IPTABLES_RETURN] iptables $@ -d x.x.x.x/8 -j RETURN
+  iptables $@ -d 0/8 -j RETURN
+  iptables $@ -d 127/8 -j RETURN
+  iptables $@ -d 10/8 -j RETURN
+  iptables $@ -d 169.254/16 -j RETURN
+  iptables $@ -d 172.16/12 -j RETURN
+  iptables $@ -d 192.168/16 -j RETURN
+  iptables $@ -d 224/4 -j RETURN
+  iptables $@ -d 240/4 -j RETURN
+}
+
 function netfilter_build_iptables(){
   echo "[NETFILTER] build iptables"
-  # enable iptable rules
+
+  #============================================
+  # Create new chain
   iptables -t nat -N SHADOWSOCKS
 
-  iptables -t nat -A SHADOWSOCKS -d 0/8 -j RETURN
-  iptables -t nat -A SHADOWSOCKS -d 127/8 -j RETURN
-  iptables -t nat -A SHADOWSOCKS -d 10/8 -j RETURN
-  iptables -t nat -A SHADOWSOCKS -d 169.254/16 -j RETURN
-  iptables -t nat -A SHADOWSOCKS -d 172.16/12 -j RETURN
-  iptables -t nat -A SHADOWSOCKS -d 192.168/16 -j RETURN
-  iptables -t nat -A SHADOWSOCKS -d 224/4 -j RETURN
-  iptables -t nat -A SHADOWSOCKS -d 240/4 -j RETURN
-
+  # Ingore preserved
+  # Ignore your shadowsocks server's addresses
+  # Ignore china ips
+  iptables_return -t nat -A SHADOWSOCKS
   iptables -t nat -A SHADOWSOCKS -d $SS_SERVER_ADDR -j RETURN
-
   iptables -t nat -A SHADOWSOCKS -m set --match-set ${IPS_CN} dst -j RETURN
 
-  iptables -t nat -A SHADOWSOCKS ! -p icmp -j REDIRECT --to-ports $SS_REDIR_LOCAL_PORT
+  # Anything else should be redirected to shadowsocks's local port
+  iptables -t nat -A SHADOWSOCKS -p tcp -j REDIRECT --to-ports $SS_REDIR_LOCAL_PORT
 
-  iptables -t nat -A OUTPUT ! -p icmp -j SHADOWSOCKS
+  # Apply the rules
+  iptables -t nat -A OUTPUT -p tcp -j SHADOWSOCKS
+  iptables -t nat -A PREROUTING -p tcp -j SHADOWSOCKS
+  #============================================
+  # Create new chain
+  iptables -t mangle -N SHADOWSOCKS
+
+  # Ingore preserved
+  # Ignore your shadowsocks server's addresses
+  # Ignore china ips
+  iptables_return -t mangle -A SHADOWSOCKS
+  iptables -t mangle -A SHADOWSOCKS -d $SS_SERVER_ADDR -j RETURN
+  iptables -t mangle -A SHADOWSOCKS -m set --match-set ${IPS_CN} dst -j RETURN
+
+  # Anything else should be redirected to shadowsocks's local port
+  # iptables -t mangle -A SHADOWSOCKS -p tcp -j REDIRECT --to-ports $SS_REDIR_LOCAL_PORT
+  iptables -t mangle -A SHADOWSOCKS -p udp -j TPROXY --tproxy-mark 0x2333/0x2333 --on-ip 127.0.0.1 --on-port $SS_REDIR_LOCAL_PORT
+
+  # Apply the rules
+  iptables -t mangle -A PREROUTING -p udp -s 192.168/16 -j SHADOWSOCKS
+  #============================================
+
+  # # Apply the rules
+  # iptables -t mangle -A PREROUTING -j SHADOWSOCKS
+  iptables -t nat -A POSTROUTING -s 192.168/16 -j MASQUERADE
+
+  ip route add local 0/0 dev lo table 100
+  ip rule add fwmark 0x2333/0x2333 lookup 100
+
 }
 
 function enable_forward_stuff(){
@@ -85,8 +141,8 @@ function enable_forward_stuff(){
     sysctl -p
   fi
 
-  iptables -t nat -A PREROUTING -s 192.168/16 -j SHADOWSOCKS
-  iptables -t nat -A POSTROUTING -s 192.168/16 -j MASQUERADE
+  # iptables -t nat -A PREROUTING -s 192.168/16 -j SHADOWSOCKS
+  # iptables -t nat -A POSTROUTING -s 192.168/16 -j MASQUERADE
 }
 
 function netfilter_save_conf(){
@@ -151,7 +207,7 @@ function enable_services(){
   modules=(shadowsocks-redir shadowsocks-tunnel shadowsocks-chinadns)
   for m in ${modules[*]}
   do
-  	sn=${m}.service
+    sn=${m}.service
     if [[ $1"" == "disable" ]] ; then
       systemctl disable ${sn}
       systemctl stop ${sn}
@@ -170,7 +226,7 @@ function disable_transparent_proxy(){
 
 function enable_transparent_proxy(){
   disable_transparent_proxy
-  # fetch_china_ips
+  fetch_china_ips
   build_iptables
   dns_use_localhost
   config_service
