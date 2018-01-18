@@ -1,4 +1,7 @@
 # raspberry-ss
+Setup transparent proxy server (use shadowsocks & chinadns) on raspberry pi
+
+## intro
 Using shadowsocks (SS) requires server setup and client setup.
 * SS server steps: (Run on a remote machine with full www access)
   * Install SS service
@@ -9,14 +12,16 @@ Using shadowsocks (SS) requires server setup and client setup.
   * Config the application's proxy to point to the SS client's service port. Applications are varied, a browser, a tool runs in command line, a script. For some tools, proxy setting is hard. And there are tools without proxy setting option even more. 
 
 Generally, client configuration is required for every device. (although you may share SS service from a device, but proxy setting is still required)
-Suppose we can setup a transparent proxy server, and run SS client in backgound, then, no more device side setting is required.
+
+Suppose we have a transparent proxy server, and run SS client in backgound, then, no more device side setting is required.
 
 This project will help you to setup a transparent proxy server on raspberry pi 3. (The raspberry will work as a gateway)
 NOTE: only tested on raspberry pi 3 model b (with official os: Raspbian). 
 
 ## Environment
 Suppose you have many smart devices, e.g., computers, smart phones, pads. Devices connet to the internet through a same router.
-First of all, you should have an existing SS server. (Service configuration still required, and detailed steps are not inclued here)
+
+Annd, you should have an existing SS server. (Service configuration still required, and detailed steps are not inclued here)
 
 ## Steps
 
@@ -65,6 +70,9 @@ First of all, you should have an existing SS server. (Service configuration stil
  Method 2 is recommended, because no any device side configuration required.
  
 # raspberry-ss
+在树莓派上配置一个透明代理 (使用 shadowsocks & chinadns)
+
+## 简介
 使用shadowsocks (SS)需要服务端的设置和客户端的设置。
 * SS 服务端步骤: (运行在一个没有网络访问限制的远程服务器上)
   * 安装SS服务
@@ -75,13 +83,15 @@ First of all, you should have an existing SS server. (Service configuration stil
   * 配置应用代理（使其指向SS客户端的服务端口）。应用有很多：浏览器、程序、脚本。有些工具配置起来非常麻烦，有些工具干脆就不提供配置选项。
 
 对每台设备的配置都是必不可少的。好在某些SS客户端可以共享连接，但是应用代理的配置依然必须。
+
 如果我们建立一个透明代理，在透明代理后面运行SS客户端，那么我们就可以避免智能终端上的配置。
 
 这里我们将在一台树莓派p3 b型（官方操作系统Raspbian）上配置一个这样的透明代理，（把树莓派当网关使用）
 
 ## 环境
 假设你有很多智能设备：电脑、智能手机、平板电脑。它们都通过同一个路由器上网。
-首先，你需要一台SS服务器。 (详细配置过程不在此讨论)
+
+另外，你需要一台SS服务器。 (详细配置过程不在此讨论)
 
 ## 步骤
 
